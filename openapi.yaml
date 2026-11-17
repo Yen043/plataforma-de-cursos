@@ -1,0 +1,306 @@
+openapi: 3.1.0
+info:
+  title: Aula API
+  version: 0.2.0
+  description: API REST de la plataforma Aula. Las rutas marcadas como demo no son aptas para producción.
+servers:
+  - url: http://localhost:3000
+paths:
+  /api/cursos:
+    get:
+      summary: Listar cursos publicados o catálogo de demostración
+      responses:
+        '200':
+          description: Catálogo de cursos
+    post:
+      summary: Crear un curso (docente autenticado)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [slug, titulo, descripcion]
+              properties:
+                slug: { type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$' }
+                titulo: { type: string, minLength: 5, maxLength: 100 }
+                descripcion: { type: string, minLength: 10, maxLength: 500 }
+                imagenUrl: { type: string, format: uri }
+      responses:
+        '201': { description: Curso creado }
+        '400': { description: Datos inválidos }
+        '401': { description: No autenticado }
+        '403': { description: Sin permisos }
+        '409': { description: Curso duplicado }
+  /api/usuarios/registro:
+    post:
+      summary: Crear perfil asociado a un token Firebase válido
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201': { description: Perfil creado }
+        '400': { description: Datos inválidos }
+        '401': { description: Token inválido }
+        '403': { description: Correo no coincide }
+        '409': { description: Perfil existente }
+  /api/auth/sesion:
+    post:
+      summary: Crear cookie de sesión HttpOnly
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [idToken]
+              properties:
+                idToken: { type: string }
+      responses:
+        '204': { description: Sesión creada }
+        '400': { description: Token ausente }
+        '401': { description: Token inválido o autenticación no reciente }
+    delete:
+      summary: Cerrar sesión
+      responses:
+        '204': { description: Cookie eliminada }
+  /api/auth/yo:
+    get:
+      summary: Consultar usuario autenticado
+      responses:
+        '200': { description: Usuario y rol }
+        '401': { description: Sesión ausente o inválida }
+  /api/quizzes/{id}:
+    post:
+      summary: Calificar evaluación de demostración (no usar en producción)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [respuesta]
+              properties:
+                respuesta: { type: string }
+      responses:
+        '200': { description: Resultado de la evaluación }
+        '400': { description: Respuesta inválida }
+        '404': { description: Evaluación no encontrada }
+        '429': { description: Espera de 24 horas }
+  /api/cursos/{slug}:
+    get:
+      summary: Consultar un curso publicado o un curso propio
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Detalle público o privado autorizado }
+        '401': { description: No autenticado para cursos no publicados }
+        '403': { description: No es el docente propietario }
+        '404': { description: Curso no encontrado }
+    patch:
+      summary: Cambiar estado de un curso propio
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [estado]
+              properties:
+                estado: { type: string, enum: [borrador, publicado, archivado] }
+      responses:
+        '200': { description: Estado actualizado }
+        '400': { description: Validación }
+        '401': { description: No autenticado }
+        '403': { description: No es propietario/docente }
+  /api/cursos/{slug}/inscripcion:
+    post:
+      summary: Inscribirse en un curso publicado
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      responses:
+        '201': { description: Inscripción registrada }
+        '401': { description: No autenticado }
+        '404': { description: Curso no disponible }
+  /api/cursos/{slug}/lecciones:
+    get:
+      summary: Listar lecciones públicas o disponibles para el estudiante inscrito
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Lecciones visibles para el usuario }
+        '404': { description: Curso no disponible }
+    post:
+      summary: Crear una lección en un curso propio
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      responses:
+        '201': { description: Lección creada }
+        '400': { description: Datos inválidos }
+        '401': { description: No autenticado }
+        '403': { description: Sin permisos }
+  /api/cursos/{slug}/lecciones/{leccion}:
+    get:
+      summary: Leer una lección pública de vista previa o inscrita
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+        - in: path
+          name: leccion
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Contenido de la lección }
+        '403': { description: Requiere inscripción }
+        '404': { description: No encontrada }
+  /api/cursos/{slug}/lecciones/{leccion}/completar:
+    post:
+      summary: Marcar una lección como completada
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+        - in: path
+          name: leccion
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Progreso actualizado }
+        '401': { description: No autenticado }
+        '403': { description: Sin inscripción }
+  /api/cursos/{slug}/quizzes:
+    post:
+      summary: Crear un cuestionario con clave privada para el docente propietario
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      responses:
+        '201': { description: Cuestionario creado }
+        '400': { description: Datos o clave inválidos }
+        '401': { description: No autenticado }
+        '403': { description: Sin permisos }
+  /api/cursos/{slug}/quizzes/{qid}:
+    get:
+      summary: Consultar preguntas y opciones sin la clave correcta
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+        - in: path
+          name: qid
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Quiz sin respuestas correctas }
+        '403': { description: Requiere inscripción }
+  /api/cursos/{slug}/quizzes/{qid}/intentos:
+    post:
+      summary: Presentar quiz y registrar calificación en el servidor
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+        - in: path
+          name: qid
+          required: true
+          schema: { type: string }
+      responses:
+        '201': { description: Resultado registrado }
+        '400': { description: Respuestas inválidas }
+        '401': { description: No autenticado }
+        '403': { description: Requiere inscripción }
+        '429': { description: Límite de intentos }
+  /api/docente/cursos/{slug}/estadisticas:
+    get:
+      summary: Consultar estadísticas del curso propio por lección y pregunta
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Estadísticas agregadas }
+        '401': { description: No autenticado }
+        '403': { description: Sin permisos }
+
+  /api/docente/cursos:
+    get:
+      summary: Listar cursos del docente autenticado
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Cursos propios }
+        '401': { description: No autenticado }
+        '403': { description: Sin rol docente }
+  /api/cursos/{slug}/certificado:
+    post:
+      summary: Emitir certificado tras completar lecciones y aprobar quiz
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      responses:
+        '201': { description: Certificado emitido }
+        '401': { description: No autenticado }
+        '409': { description: Curso incompleto o quiz pendiente }
+  /api/certificados:
+    get:
+      summary: Listar certificados del estudiante autenticado
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Certificados del usuario }
+        '401': { description: No autenticado }
+  /api/certificados/{codigo}:
+    get:
+      summary: Verificar un certificado mediante su código
+      parameters:
+        - in: path
+          name: codigo
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Certificado válido }
+        '404': { description: Código no encontrado }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer

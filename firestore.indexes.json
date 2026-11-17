@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "resultadosQuiz",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "cursoSlug", "order": "ASCENDING" },
+        { "fieldPath": "estado", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
